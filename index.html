@@ -32,59 +32,6 @@
       --text-bright: #e0f0ff;
       --scrollbar: #112840;
     }
-    /* ── Responsive / Mobil ─────────────────────────── */
-    @media (max-width: 860px) {
-      body { overflow-y: auto; height: auto; }
-
-      .app { height: auto; min-height: 100vh; }
-
-      .header {
-        flex-wrap: wrap; gap: 6px; padding: 8px 10px;
-      }
-      .header-stats { gap: 12px; order: 3; width: 100%; justify-content: space-around; display: flex; }
-      .header-right { gap: 6px; flex-wrap: wrap; }
-      .crisis-btn { font-size: 9px; padding: 5px 8px; letter-spacing: 1px; }
-      .reset-btn  { font-size: 9px; padding: 5px 7px; }
-      .qr-btn     { font-size: 9px; padding: 5px 8px; }
-      .time-display { font-size: 11px; }
-      .hstat-val  { font-size: 16px; }
-
-      .content {
-        display: flex; flex-direction: column;
-        overflow: visible; height: auto;
-      }
-
-      /* Harita en üste, sabit yükseklik */
-      .map-col { order: 0; height: 320px; flex-shrink: 0; }
-      #map     { height: 320px; }
-      .map-overlay-badge { font-size: 9px; padding: 3px 10px; }
-
-      /* Sol ve sağ kolonlar alt alta, scroll yok */
-      .left-col, .right-col {
-        order: 1; height: auto; overflow: visible;
-        border: none; border-top: 1px solid var(--border-hi);
-      }
-
-      /* Dron kartları yan yana scroll */
-      .drone-cards-wrap {
-        display: flex; gap: 8px;
-        overflow-x: auto; padding-bottom: 6px;
-      }
-      .drone-card { min-width: 200px; flex-shrink: 0; }
-
-      /* District listesi 2 kolon */
-      .district-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 0;
-      }
-
-      /* QR modal tam ekran */
-      .qr-modal { width: 92vw; padding: 20px; }
-      #qr-canvas canvas { width: 100% !important; height: auto !important; }
-
-      /* Footer küçült */
-      .footer { font-size: 9px; padding: 4px 10px; flex-wrap: wrap; gap: 4px; }
-    }
-
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: var(--bg);
@@ -542,6 +489,131 @@
     @keyframes slidedown {
       from { transform: translateY(-100%); opacity: 0; }
       to   { transform: translateY(0);     opacity: 1; }
+    }
+
+    /* ════════════════════════════════════════════════
+       MOBİL RESPONSIVE  (max-width: 860px)
+       Bu blok tüm CSS'in sonunda olmalı — override eder
+    ════════════════════════════════════════════════ */
+    @media (max-width: 860px) {
+      /* Temel */
+      html, body { height: auto !important; overflow: auto !important; }
+      .app { height: auto !important; min-height: 100vh; }
+
+      /* Header — 2 satır */
+      .header {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        padding: 8px 10px !important;
+        row-gap: 6px;
+      }
+      .header-logo { flex: 1; min-width: 120px; }
+      .logo-title  { font-size: 14px !important; }
+      .logo-sub    { font-size: 8px !important; }
+      .header-right {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 5px !important;
+        align-items: center;
+      }
+      .header-stats {
+        order: 10; width: 100%;
+        display: flex !important;
+        justify-content: space-around;
+        padding: 4px 0;
+        border-top: 1px solid var(--border);
+      }
+      .hstat-val   { font-size: 17px !important; }
+      .hstat-label { font-size: 8px !important; }
+      .time-display{ font-size: 11px !important; }
+      .mode-badge  { font-size: 9px !important; padding: 4px 8px !important; }
+      .qr-btn      { font-size: 9px !important; padding: 4px 8px !important; }
+      .crisis-btn  { font-size: 9px !important; padding: 4px 8px !important; letter-spacing: 1px !important; }
+      .reset-btn   { font-size: 9px !important; padding: 4px 7px !important; }
+
+      /* Content — tek kolon, dikey */
+      .content {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      /* Harita — tam genişlik, sabit yükseklik */
+      .map-col { order: 0; width: 100% !important; height: 280px !important; flex-shrink: 0; }
+      #map     { height: 280px !important; }
+      .map-legend { bottom: 8px; left: 8px; padding: 6px 8px; }
+      .map-legend .legend-dot { width: 8px; height: 8px; }
+      .map-overlay-badge { font-size: 8px !important; padding: 2px 8px !important; }
+
+      /* Sol panel — haritanın altında, tam genişlik */
+      .left-col {
+        order: 1 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        border-right: none !important;
+        border-top: 1px solid var(--border-hi);
+      }
+
+      /* Sağ panel — en alta */
+      .right-col {
+        order: 2 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        border-left: none !important;
+        border-top: 1px solid var(--border-hi);
+      }
+
+      /* Section içleri */
+      .section { padding: 10px 12px; }
+      .section-title { font-size: 9px !important; margin-bottom: 8px !important; }
+
+      /* AI Panel */
+      .ai-mode-big { font-size: 20px !important; }
+      .pred-val    { font-size: 15px !important; }
+      .pred-time   { font-size: 8px !important; }
+      .rec-item    { font-size: 10px !important; }
+
+      /* Dron kartları — yatay kaydırma */
+      .section .drone-card:first-of-type ~ .drone-card { display: none; }
+      .drone-card { margin-bottom: 6px; }
+      .drone-name { font-size: 12px !important; }
+
+      /* Bölge listesi — 2 kolon */
+      .section:has(.district-item) { padding: 8px 10px; }
+      .district-item {
+        grid-template-columns: 80px 1fr 32px !important;
+        font-size: 10px !important;
+        padding: 3px 0 !important;
+      }
+      .district-name { font-size: 11px !important; }
+      .cong-val      { font-size: 10px !important; }
+
+      /* Bildirimler */
+      .notif-card  { padding: 6px 8px; }
+      .notif-to    { font-size: 11px !important; }
+      .notif-msg   { font-size: 10px !important; }
+      .send-btn    { font-size: 10px !important; padding: 5px 8px !important; }
+
+      /* QR Modal — tam ekran */
+      .qr-overlay  { padding: 16px; }
+      .qr-modal    { width: 100% !important; padding: 20px 16px; }
+      .qr-title    { font-size: 10px !important; }
+      .qr-subtitle { font-size: 14px !important; margin-bottom: 14px !important; }
+
+      /* Kriz banner */
+      .crisis-alert-bar { font-size: 10px !important; letter-spacing: 1px !important; }
+
+      /* Footer */
+      .footer {
+        font-size: 9px !important;
+        padding: 4px 10px !important;
+        flex-wrap: wrap !important;
+        gap: 3px !important;
+        justify-content: center;
+      }
     }
   </style>
 </head>
