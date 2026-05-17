@@ -32,29 +32,57 @@
       --text-bright: #e0f0ff;
       --scrollbar: #112840;
     }
-    /* ── Mobil uyarı ────────────────────────────────── */
-    .mobile-wall {
-      display: none;
-      position: fixed; inset: 0; z-index: 99999;
-      background: #040b17;
-      flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; padding: 32px;
-      font-family: 'Inter', system-ui, sans-serif;
-    }
-    .mobile-wall .mw-icon  { font-size: 56px; margin-bottom: 20px; }
-    .mobile-wall .mw-title { font-size: 22px; font-weight: 700; color: #e0f0ff; margin-bottom: 12px; }
-    .mobile-wall .mw-sub   { font-size: 14px; color: #4a7a9e; line-height: 1.6; margin-bottom: 24px; }
-    .mobile-wall .mw-url   {
-      font-size: 13px; color: #00d4ff;
-      font-family: 'Courier New', monospace;
-      background: rgba(0,212,255,0.08);
-      border: 1px solid #1e4a72; border-radius: 6px;
-      padding: 10px 16px; word-break: break-all;
-    }
-    @media (max-width: 900px) {
-      .mobile-wall { display: flex; }
-      #root { display: none; }
+    /* ── Responsive / Mobil ─────────────────────────── */
+    @media (max-width: 860px) {
+      body { overflow-y: auto; height: auto; }
+
+      .app { height: auto; min-height: 100vh; }
+
+      .header {
+        flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+      }
+      .header-stats { gap: 12px; order: 3; width: 100%; justify-content: space-around; display: flex; }
+      .header-right { gap: 6px; flex-wrap: wrap; }
+      .crisis-btn { font-size: 9px; padding: 5px 8px; letter-spacing: 1px; }
+      .reset-btn  { font-size: 9px; padding: 5px 7px; }
+      .qr-btn     { font-size: 9px; padding: 5px 8px; }
+      .time-display { font-size: 11px; }
+      .hstat-val  { font-size: 16px; }
+
+      .content {
+        display: flex; flex-direction: column;
+        overflow: visible; height: auto;
+      }
+
+      /* Harita en üste, sabit yükseklik */
+      .map-col { order: 0; height: 320px; flex-shrink: 0; }
+      #map     { height: 320px; }
+      .map-overlay-badge { font-size: 9px; padding: 3px 10px; }
+
+      /* Sol ve sağ kolonlar alt alta, scroll yok */
+      .left-col, .right-col {
+        order: 1; height: auto; overflow: visible;
+        border: none; border-top: 1px solid var(--border-hi);
+      }
+
+      /* Dron kartları yan yana scroll */
+      .drone-cards-wrap {
+        display: flex; gap: 8px;
+        overflow-x: auto; padding-bottom: 6px;
+      }
+      .drone-card { min-width: 200px; flex-shrink: 0; }
+
+      /* District listesi 2 kolon */
+      .district-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      }
+
+      /* QR modal tam ekran */
+      .qr-modal { width: 92vw; padding: 20px; }
+      #qr-canvas canvas { width: 100% !important; height: auto !important; }
+
+      /* Footer küçült */
+      .footer { font-size: 9px; padding: 4px 10px; flex-wrap: wrap; gap: 4px; }
     }
 
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -518,16 +546,29 @@
   </style>
 </head>
 <body>
-<div class="mobile-wall">
-  <div class="mw-icon">🖥️</div>
-  <div class="mw-title">AğdaKal</div>
-  <div class="mw-sub">
-    Bu uygulama masaüstü tarayıcısı için tasarlanmıştır.<br/>
-    Canlı demoya bilgisayardan erişebilirsiniz:
+<div id="loading" style="
+  position:fixed;inset:0;background:#040b17;z-index:99999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Courier New',monospace;color:#00d4ff;gap:16px;
+">
+  <div style="font-size:32px;">📡</div>
+  <div style="font-size:16px;font-weight:bold;letter-spacing:2px;">AğdaKal</div>
+  <div style="font-size:11px;color:#4a7a9e;letter-spacing:1px;">YÜKLENİYOR…</div>
+  <div style="width:160px;height:3px;background:#112840;border-radius:2px;overflow:hidden;">
+    <div id="load-bar" style="height:100%;background:#00d4ff;border-radius:2px;width:0%;transition:width 0.4s;"></div>
   </div>
-  <div class="mw-url">bahadirgokturk.github.io/Agda_Kal</div>
 </div>
 <div id="root"></div>
+<script>
+  // Loading bar animasyonu — Babel yüklenirken göster
+  let p = 0;
+  const bar = document.getElementById('load-bar');
+  const iv = setInterval(() => { p = Math.min(p + Math.random()*18, 90); bar.style.width = p + '%'; }, 300);
+  window.__hideLoading = function() {
+    bar.style.width = '100%';
+    setTimeout(() => { document.getElementById('loading').style.display = 'none'; clearInterval(iv); }, 300);
+  };
+</script>
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
@@ -992,6 +1033,9 @@ function App() {
   const notifIdRef    = useRef(100);
   const tickRef       = useRef(0);
   const districtsRef  = useRef(INIT_DISTRICTS);
+
+  /* loading ekranını kapat */
+  useEffect(() => { window.__hideLoading && window.__hideLoading(); }, []);
 
   /* districts ref sync — drone hareketi için */
   useEffect(() => { districtsRef.current = districts; }, [districts]);
