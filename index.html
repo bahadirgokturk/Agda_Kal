@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AğdaKal — İzmir Ağ İzleme Merkezi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -390,6 +391,58 @@
     .footer-amber { color:var(--amber); }
     .footer-red   { color:var(--red); }
 
+    /* ── QR Modal ───────────────────────────────────── */
+    .qr-btn {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+      padding: 6px 12px; border-radius: 4px; cursor: pointer;
+      background: rgba(0,212,255,0.08);
+      border: 1px solid var(--cyan); color: var(--cyan);
+      transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .qr-btn:hover { background: rgba(0,212,255,0.2); box-shadow: 0 0 12px rgba(0,212,255,0.3); }
+    .qr-overlay {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(2, 6, 14, 0.88);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+      animation: fadein 0.2s ease;
+    }
+    @keyframes fadein { from { opacity:0; } to { opacity:1; } }
+    .qr-modal {
+      background: rgba(5,12,28,0.98);
+      border: 1px solid var(--border-hi);
+      border-radius: 10px;
+      padding: 28px 32px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(0,212,255,0.15);
+      min-width: 280px;
+    }
+    .qr-title {
+      font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: var(--cyan); font-weight: 600; margin-bottom: 6px;
+    }
+    .qr-subtitle {
+      font-size: 13px; font-weight: 700; color: var(--text-bright);
+      margin-bottom: 20px;
+    }
+    #qr-canvas {
+      background: #fff; border-radius: 6px;
+      padding: 10px; display: inline-block;
+      margin-bottom: 16px;
+    }
+    .qr-url {
+      font-size: 10px; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      word-break: break-all; margin-bottom: 16px;
+    }
+    .qr-close {
+      font-size: 11px; font-weight: 600;
+      padding: 7px 20px; border-radius: 4px; cursor: pointer;
+      background: transparent; border: 1px solid var(--border-hi);
+      color: var(--text); transition: all 0.2s;
+    }
+    .qr-close:hover { border-color: var(--cyan); color: var(--cyan); }
+
     /* ── Kriz butonu ────────────────────────────────── */
     .crisis-btn {
       font-size: 11px; font-weight: bold; letter-spacing: 2px;
@@ -515,6 +568,36 @@ function generateReason(district, source = 'OTOMATİK') {
   parts.push(`${isp} altyapısı`);
 
   return `${name} seçildi: ${parts.join(', ')}. Kaynak: ${source}.`;
+}
+
+const LIVE_URL = 'https://bahadirgokturk.github.io/Agda_Kal/';
+
+/* ─────────────────────────────────────────────────────
+   QR MODAL
+───────────────────────────────────────────────────── */
+function QRModal({ onClose }) {
+  const qrRef = useRef(null);
+  useEffect(() => {
+    if (!qrRef.current) return;
+    qrRef.current.innerHTML = '';
+    new QRCode(qrRef.current, {
+      text: LIVE_URL,
+      width: 220, height: 220,
+      colorDark: '#000000', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H,
+    });
+  }, []);
+  return (
+    <div className="qr-overlay" onClick={onClose}>
+      <div className="qr-modal" onClick={e => e.stopPropagation()}>
+        <div className="qr-title">Canlı Demo</div>
+        <div className="qr-subtitle">AğdaKal — İzmir Ağ İzleme Merkezi</div>
+        <div id="qr-canvas" ref={qrRef} />
+        <div className="qr-url">{LIVE_URL}</div>
+        <button className="qr-close" onClick={onClose}>✕ Kapat</button>
+      </div>
+    </div>
+  );
 }
 
 /* ─────────────────────────────────────────────────────
@@ -816,7 +899,7 @@ function DistrictList({ districts, selected, onSelect }) {
 /* ─────────────────────────────────────────────────────
    HEADER
 ───────────────────────────────────────────────────── */
-function Header({ districts, aiMode, time, onCrisis, onReset, crisisActive }) {
+function Header({ districts, aiMode, time, onCrisis, onReset, crisisActive, onShowQR }) {
   const outages   = districts.filter(d=>d.outage).length;
   const avgCong   = Math.round(districts.reduce((s,d)=>s+d.congestion,0)/districts.length);
   const critical  = districts.filter(d=>d.congestion>=80).length;
@@ -849,6 +932,7 @@ function Header({ districts, aiMode, time, onCrisis, onReset, crisisActive }) {
       <div className="header-right">
         <span className={`mode-badge mode-${aiMode}`}>◉ {aiMode}</span>
         <span className="time-display">{fmtTime(time)}</span>
+        <button className="qr-btn" onClick={onShowQR}>📱 QR DEMO</button>
         <button className="crisis-btn" onClick={onCrisis} disabled={crisisActive}>
           ⚡ KRİZ SİMÜLASYONU
         </button>
@@ -870,6 +954,7 @@ function App() {
   const [selected,      setSelected]      = useState(null);
   const [time,          setTime]          = useState(new Date());
   const [crisisActive,  setCrisisActive]  = useState(false);
+  const [showQR,        setShowQR]        = useState(false);
   const notifIdRef    = useRef(100);
   const tickRef       = useRef(0);
   const districtsRef  = useRef(INIT_DISTRICTS);
@@ -1055,8 +1140,10 @@ function App() {
           🚨 KRİZ MODU AKTİF — YZ EŞ ZAMANLI KESİNTİ TESPİT ETTİ — DRONLAR SAHADА — OTORİTELER BİLGİLENDİRİLDİ 🚨
         </div>
       )}
+      {showQR && <QRModal onClose={() => setShowQR(false)} />}
       <Header districts={districts} aiMode={aiMode} time={time}
-        onCrisis={handleCrisis} onReset={handleReset} crisisActive={crisisActive} />
+        onCrisis={handleCrisis} onReset={handleReset} crisisActive={crisisActive}
+        onShowQR={() => setShowQR(true)} />
       <div className="content">
         {/* LEFT */}
         <div className="left-col">
