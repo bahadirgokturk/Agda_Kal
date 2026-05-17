@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AğdaKal — İzmir Ağ İzleme Merkezi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #040b17;
+      --panel: rgba(5,12,28,0.97);
+      --panel2: rgba(8,18,38,0.95);
+      --border: #112840;
+      --border-hi: #1e4a72;
+      --cyan: #00d4ff;
+      --cyan-dim: #0090b8;
+      --green: #00ff88;
+      --amber: #ffaa00;
+      --red: #ff3355;
+      --purple: #a855f7;
+      --text: #b8d4ee;
+      --text-dim: #4a7a9e;
+      --text-bright: #e0f0ff;
+      --scrollbar: #112840;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    /* ── Layout ─────────────────────────────────────── */
+    .app { display:flex; flex-direction:column; height:100vh; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border-hi);
+      flex-shrink: 0;
+      z-index: 2000;
+    }
+    .header-logo {
+      display:flex; align-items:center; gap:10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg,#0048ff22,#00d4ff44);
+      border: 1px solid var(--cyan-dim);
+      border-radius: 6px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px;
+    }
+    .logo-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text-bright);
+      font-family: 'Inter', sans-serif;
+    }
+    .logo-sub {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 2.5px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .header-stats {
+      display:flex; gap:20px;
+    }
+    .hstat {
+      text-align:center;
+    }
+    .hstat-val {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .hstat-label {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+    .header-right {
+      display:flex; align-items:center; gap:12px;
+    }
+    .mode-badge {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      border: 1px solid currentColor;
+      animation: modepulse 1.8s ease-in-out infinite;
+      font-family: 'Inter', sans-serif;
+    }
+    @keyframes modepulse {
+      0%,100% { opacity:1; }
+      50% { opacity:0.6; }
+    }
+    .mode-NORMAL { color:var(--green); }
+    .mode-ALERT  { color:var(--amber); }
+    .mode-CRISIS { color:var(--red); }
+    .time-display {
+      font-size: 13px;
+      color: var(--cyan);
+      letter-spacing: 1px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    /* ── Content grid ───────────────────────────────── */
+    .content {
+      display:grid;
+      grid-template-columns: 290px 1fr 290px;
+      flex:1;
+      overflow:hidden;
+    }
+    .left-col, .right-col {
+      display:flex; flex-direction:column;
+      overflow-y:auto;
+      background: var(--panel);
+      position:relative;
+    }
+    .left-col  { border-right: 1px solid var(--border-hi); }
+    .right-col { border-left:  1px solid var(--border-hi); }
+    .map-col   { position:relative; }
+    #map       { width:100%; height:100%; }
+
+    /* ── Panel sections ─────────────────────────────── */
+    .section {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+    }
+    .section-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      display:flex; align-items:center; gap:7px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+    .section-title::before {
+      content:'';
+      width:5px; height:5px;
+      background:var(--cyan);
+      border-radius:50%;
+      flex-shrink:0;
+      box-shadow:0 0 6px var(--cyan);
+    }
+
+    /* ── AI Panel ───────────────────────────────────── */
+    .ai-status-row {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:8px;
+    }
+    .ai-mode-big {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .ai-toggle {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border: 1px solid var(--border-hi);
+      border-radius: 4px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text);
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .ai-toggle:hover { border-color:var(--cyan); color:var(--cyan); }
+    .ai-toggle.on { border-color:var(--green); color:var(--green); }
+
+    .pred-row {
+      display:grid; grid-template-columns:1fr 1fr 1fr;
+      gap:5px; margin-bottom:10px;
+    }
+    .pred-card {
+      background:var(--panel2);
+      border:1px solid var(--border);
+      border-radius:5px;
+      padding:7px 4px;
+      text-align:center;
+    }
+    .pred-time { font-size:9px; color:var(--text-dim); font-weight:500; margin-bottom:2px; }
+    .pred-val  { font-size:18px; font-weight:700; font-family:'JetBrains Mono',monospace; line-height:1.2; }
+    .pred-trend { font-size:10px; font-weight:500; margin-top:1px; }
+
+    .rec-list { list-style:none; }
+    .rec-item {
+      font-size: 11px;
+      font-weight: 400;
+      padding: 4px 0 4px 10px;
+      border-left: 2px solid var(--border-hi);
+      margin-bottom: 5px;
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .rec-item.high { border-color:var(--red); }
+    .rec-item.med  { border-color:var(--amber); }
+    .rec-item.low  { border-color:var(--green); }
+
+    /* ── Drones ─────────────────────────────────────── */
+    .drone-card {
+      background:var(--panel2);
+      border:1px solid var(--border);
+      border-radius:4px;
+      padding:7px 8px;
+      margin-bottom:5px;
+    }
+    .drone-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:4px;
+    }
+    .drone-name { font-size:13px; font-weight:600; color:var(--text-bright); font-family:'Inter',sans-serif; }
+    .drone-status-tag {
+      font-size:9px; letter-spacing:0.5px; padding:3px 7px;
+      border-radius:3px; font-weight:700; font-family:'Inter',sans-serif;
+    }
+    .st-STANDBY    { background:#1a3a5c22; color:#6aadde; border:1px solid #1e4a72; }
+    .st-DEPLOYED   { background:#00ff8822; color:var(--green); border:1px solid var(--green); }
+    .st-EN_ROUTE   { background:#ffaa0022; color:var(--amber); border:1px solid var(--amber); }
+    .st-ON_SITE    { background:#ff335522; color:var(--red); border:1px solid var(--red); }
+    .st-MAINTENANCE{ background:#7c3aed22; color:var(--purple); border:1px solid var(--purple); }
+    .st-RETURNING  { background:#00d4ff22; color:var(--cyan); border:1px solid var(--cyan); }
+
+    .drone-battery {
+      display:flex; align-items:center; gap:6px; margin-bottom:4px;
+    }
+    .bat-bar {
+      flex:1; height:4px; background:#112840; border-radius:2px; overflow:hidden;
+    }
+    .bat-fill {
+      height:100%; border-radius:2px; transition:width 0.5s;
+    }
+    .bat-label { font-size:10px; color:var(--text-dim); width:32px; text-align:right; font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+    .drone-btn {
+      font-size: 10px; font-weight:600; letter-spacing:0.3px;
+      padding: 4px 9px;
+      border-radius:4px;
+      cursor:pointer;
+      background:transparent;
+      border:1px solid;
+      transition:all 0.2s;
+      margin-right:4px;
+      font-family:'Inter',sans-serif;
+    }
+    .btn-deploy  { border-color:var(--green); color:var(--green); }
+    .btn-deploy:hover { background:#00ff8822; }
+    .btn-recall  { border-color:var(--amber); color:var(--amber); }
+    .btn-recall:hover { background:#ffaa0022; }
+    .btn-disabled{ border-color:var(--border-hi); color:var(--text-dim); cursor:not-allowed; }
+
+    /* ── Notifications ──────────────────────────────── */
+    .notif-card {
+      background:var(--panel2);
+      border:1px solid var(--border);
+      border-radius:4px;
+      padding:7px 8px;
+      margin-bottom:5px;
+      font-size:10px;
+    }
+    .notif-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:3px;
+    }
+    .notif-to { font-weight:700; color:var(--text-bright); font-size:12px; }
+    .notif-status {
+      font-size:9px; letter-spacing:0.5px; padding:2px 7px;
+      border-radius:3px; font-weight:700;
+    }
+    .ns-SENT    { background:#00ff8822; color:var(--green); }
+    .ns-PENDING { background:#ffaa0022; color:var(--amber); }
+    .ns-FAILED  { background:#ff335522; color:var(--red); }
+
+    .notif-msg  { color:var(--text); line-height:1.5; margin-bottom:4px; font-size:11px; }
+    .notif-time { color:var(--text-dim); font-size:10px; font-family:'JetBrains Mono',monospace; }
+
+    .send-btn {
+      font-size:11px; font-weight:600; letter-spacing:0.5px; padding:6px 10px;
+      border-radius:3px; cursor:pointer;
+      background:transparent; border:1px solid var(--cyan);
+      color:var(--cyan); transition:all 0.2s; margin-top:6px;
+      display:block; width:100%;
+    }
+    .send-btn:hover { background:#00d4ff22; }
+
+    /* ── District list ──────────────────────────────── */
+    .district-item {
+      display:grid;
+      grid-template-columns: 90px 1fr 36px;
+      align-items:center; gap:6px;
+      padding:4px 0; font-size:10px;
+      border-bottom:1px solid var(--border);
+      cursor:pointer;
+      transition:background 0.15s;
+    }
+    .district-item:hover { background:rgba(0,212,255,0.04); }
+    .district-item.selected { background:rgba(0,212,255,0.08); }
+    .district-name { color:var(--text-bright); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; font-weight:500; }
+    .cong-bar-wrap { height:5px; background:#112840; border-radius:3px; overflow:hidden; }
+    .cong-bar { height:100%; border-radius:3px; transition:width 0.5s; }
+    .cong-val  { text-align:right; font-weight:700; font-size:11px; font-family:'JetBrains Mono',monospace; }
+    .outage-dot {
+      display:inline-block; width:7px; height:7px;
+      background:var(--red); border-radius:50%;
+      box-shadow:0 0 8px var(--red);
+      animation:blink 0.9s ease-in-out infinite;
+      margin-left:4px;
+    }
+    @keyframes blink {
+      0%,100%{opacity:1;} 50%{opacity:0.2;}
+    }
+
+    /* ── Map overlays ───────────────────────────────── */
+    .map-legend {
+      position:absolute; bottom:20px; left:12px;
+      background:rgba(4,11,23,0.88);
+      border:1px solid var(--border-hi);
+      border-radius:5px; padding:8px 10px;
+      z-index:1000; font-size:9px;
+    }
+    .legend-row { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+    .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .map-overlay-badge {
+      position:absolute; top:12px; left:50%; transform:translateX(-50%);
+      background:rgba(4,11,23,0.9); border:1px solid var(--border-hi);
+      border-radius:4px; padding:4px 14px;
+      font-size:10px; letter-spacing:2px; color:var(--text-dim);
+      z-index:1000;
+    }
+
+    /* Leaflet overrides */
+    .leaflet-container { background:#06101e !important; }
+    .leaflet-tile { filter: brightness(0.6) hue-rotate(185deg) saturate(0.7); }
+    .leaflet-control-attribution { background:rgba(4,11,23,0.8) !important; color:#4a7a9e !important; font-size:8px !important; }
+    .leaflet-control-zoom a { background:rgba(5,12,28,0.95) !important; color:var(--cyan) !important; border-color:var(--border-hi) !important; }
+    .leaflet-control-zoom a:hover { background:rgba(0,212,255,0.1) !important; }
+
+    /* Drone icon */
+    .drone-icon { font-size:18px; line-height:1; text-shadow:0 0 8px var(--cyan); }
+    .outage-pulse {
+      width:20px; height:20px; background:transparent;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* Footer */
+    .footer {
+      background:var(--panel);
+      border-top:1px solid var(--border);
+      padding:5px 16px;
+      display:flex; justify-content:space-between; align-items:center;
+      font-size:10px; font-weight:500; color:var(--text-dim);
+      letter-spacing:0.5px;
+      flex-shrink:0;
+      font-family:'Inter',sans-serif;
+    }
+    .footer-green { color:var(--green); }
+    .footer-amber { color:var(--amber); }
+    .footer-red   { color:var(--red); }
+
+    /* ── Kriz butonu ────────────────────────────────── */
+    .crisis-btn {
+      font-size: 11px; font-weight: bold; letter-spacing: 2px;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer;
+      background: rgba(255,51,85,0.15);
+      border: 1px solid var(--red); color: var(--red);
+      transition: all 0.2s;
+      animation: crisisshadow 1.5s ease-in-out infinite;
+    }
+    .crisis-btn:hover { background: rgba(255,51,85,0.35); box-shadow: 0 0 18px #ff3355; }
+    @keyframes crisisshadow {
+      0%,100% { box-shadow: 0 0 6px #ff335566; }
+      50%      { box-shadow: 0 0 18px #ff3355cc; }
+    }
+    .reset-btn {
+      font-size: 10px; letter-spacing: 1px;
+      padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      background: rgba(0,212,255,0.08);
+      border: 1px solid var(--cyan-dim); color: var(--cyan);
+      transition: all 0.2s; margin-left: 6px;
+    }
+    .reset-btn:hover { background: rgba(0,212,255,0.2); }
+
+    /* ── Kriz ekran efekti ──────────────────────────── */
+    .crisis-flash {
+      position: fixed; inset: 0; z-index: 9999;
+      pointer-events: none;
+      border: 3px solid var(--red);
+      box-shadow: inset 0 0 60px rgba(255,51,85,0.25);
+      animation: crisisframe 1.2s ease-in-out infinite;
+    }
+    @keyframes crisisframe {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    .crisis-alert-bar {
+      position: fixed; top: 52px; left: 0; right: 0;
+      z-index: 3000; text-align: center;
+      background: rgba(255,51,85,0.92);
+      color: #fff; font-size: 12px; font-weight: bold;
+      letter-spacing: 3px; padding: 6px;
+      animation: slidedown 0.4s ease;
+    }
+    @keyframes slidedown {
+      from { transform: translateY(-100%); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ─────────────────────────────────────────────────────
+   MOCK DATA
+───────────────────────────────────────────────────── */
+const INIT_DISTRICTS = [
+  { id:1,  name:'Konak',      lat:38.4192, lng:27.1287, congestion:87, outage:true,  pop:420000, isp:'Türk Telekom' },
+  { id:2,  name:'Bornova',    lat:38.4689, lng:27.2167, congestion:72, outage:false, pop:380000, isp:'Superonline'  },
+  { id:3,  name:'Karşıyaka',  lat:38.4617, lng:27.1133, congestion:65, outage:false, pop:370000, isp:'Türk Telekom' },
+  { id:4,  name:'Buca',       lat:38.3833, lng:27.1833, congestion:45, outage:false, pop:430000, isp:'Vodafone'     },
+  { id:5,  name:'Bayraklı',   lat:38.4611, lng:27.1550, congestion:91, outage:true,  pop:315000, isp:'Türk Telekom' },
+  { id:6,  name:'Gaziemir',   lat:38.3183, lng:27.1267, congestion:38, outage:false, pop:105000, isp:'Superonline'  },
+  { id:7,  name:'Çiğli',      lat:38.5050, lng:27.0617, congestion:55, outage:false, pop:175000, isp:'Turkcell'     },
+  { id:8,  name:'Balçova',    lat:38.3917, lng:27.0583, congestion:42, outage:false, pop:85000,  isp:'Türk Telekom' },
+  { id:9,  name:'Karabağlar', lat:38.3667, lng:27.1500, congestion:78, outage:false, pop:360000, isp:'Vodafone'     },
+  { id:10, name:'Narlıdere',  lat:38.3900, lng:27.0167, congestion:30, outage:false, pop:72000,  isp:'Türk Telekom' },
+  { id:11, name:'Menemen',    lat:38.6133, lng:26.9767, congestion:25, outage:false, pop:125000, isp:'Superonline'  },
+  { id:12, name:'Kemalpaşa',  lat:38.4267, lng:27.4150, congestion:33, outage:false, pop:95000,  isp:'Türk Telekom' },
+  { id:13, name:'Torbalı',    lat:38.1633, lng:27.3667, congestion:28, outage:false, pop:110000, isp:'Vodafone'     },
+  { id:14, name:'Urla',       lat:38.3217, lng:26.7633, congestion:20, outage:false, pop:58000,  isp:'Türk Telekom' },
+  { id:15, name:'Selçuk',     lat:37.9517, lng:27.3683, congestion:18, outage:false, pop:35000,  isp:'Superonline'  },
+];
+
+const INIT_DRONES = [
+  { id:'DRN-01', name:'KARTAL-1', status:'STANDBY',     battery:98, lat:38.4192, lng:27.1287, target:null, progress:0 },
+  { id:'DRN-02', name:'KARTAL-2', status:'ON_SITE',     battery:72, lat:38.4611, lng:27.1550, target:5,    progress:1 },
+  { id:'DRN-03', name:'KARTAL-3', status:'STANDBY',     battery:95, lat:38.4050, lng:27.0900, target:null, progress:0 },
+  { id:'DRN-04', name:'KARTAL-4', status:'STANDBY',     battery:88, lat:38.4500, lng:27.2000, target:null, progress:0 },
+  { id:'DRN-05', name:'KARTAL-5', status:'MAINTENANCE', battery:12, lat:38.4192, lng:27.1287, target:null, progress:0 },
+];
+
+const BASE = { lat:38.4192, lng:27.1287 }; // Alsancak base
+
+const AUTHORITIES = [
+  { id:1, abbr:'BTK',  name:'BTK – Bilgi Teknolojileri ve İletişim Kurumu', color:'#a855f7' },
+  { id:2, abbr:'IBB',  name:'İzmir Büyükşehir Belediyesi',                  color:'#0891b2' },
+  { id:3, abbr:'TT',   name:'Türk Telekom A.Ş.',                            color:'#0369a1' },
+  { id:4, abbr:'EMN',  name:'İzmir Emniyet Müdürlüğü',                      color:'#dc2626' },
+];
+
+/* ─────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────── */
+function congColor(v) {
+  if (v >= 80) return '#ff3355';
+  if (v >= 60) return '#ff6a00';
+  if (v >= 40) return '#ffaa00';
+  return '#00ff88';
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function fmtTime(d) {
+  return d.toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+function fmtFull(d) {
+  return d.toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) +
+    ' — ' + d.toLocaleDateString('tr-TR', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function generateReason(district, source = 'OTOMATİK') {
+  const { name, congestion, outage, pop, isp } = district;
+  const popStr = pop >= 100000 ? `${(pop/1000).toFixed(0)}k` : `${pop.toLocaleString('tr-TR')}`;
+  const parts = [];
+
+  if (outage)          parts.push(`aktif kesinti tespit edildi`);
+  if (congestion >= 90) parts.push(`yoğunluk kritik eşiği (%${congestion}) aştı`);
+  else if (congestion >= 75) parts.push(`yoğunluk yüksek (%${congestion})`);
+  else                 parts.push(`yoğunluk %${congestion} — önleyici müdahale`);
+
+  parts.push(`${popStr} kişi etkileniyor`);
+  parts.push(`${isp} altyapısı`);
+
+  return `${name} seçildi: ${parts.join(', ')}. Kaynak: ${source}.`;
+}
+
+/* ─────────────────────────────────────────────────────
+   MAP COMPONENT
+───────────────────────────────────────────────────── */
+function MapView({ districts, drones }) {
+  const mapRef   = useRef(null);
+  const instRef  = useRef(null);
+  const heatRef  = useRef(null);
+  const droneLayerRef   = useRef({});
+  const outageLayerRef  = useRef({});
+
+  /* init map once */
+  useEffect(() => {
+    if (instRef.current) return;
+    const m = L.map(mapRef.current, {
+      center: [38.42, 27.13], zoom: 11,
+      zoomControl: true, attributionControl: true
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(m);
+    heatRef.current = L.heatLayer([], {
+      radius: 40, blur: 30, maxZoom: 16,
+      gradient: { 0.3:'#00ff88', 0.55:'#ffaa00', 0.75:'#ff6a00', 1.0:'#ff3355' }
+    }).addTo(m);
+    instRef.current = m;
+    return () => { m.remove(); instRef.current = null; };
+  }, []);
+
+  /* update heatmap */
+  useEffect(() => {
+    if (!heatRef.current) return;
+    const pts = districts.flatMap(d => {
+      const n = Math.ceil(d.congestion / 12);
+      return Array.from({ length: n }, () => [
+        d.lat + (Math.random() - 0.5) * 0.06,
+        d.lng + (Math.random() - 0.5) * 0.06,
+        d.congestion / 100
+      ]);
+    });
+    heatRef.current.setLatLngs(pts);
+  }, [districts]);
+
+  /* update outage markers */
+  useEffect(() => {
+    if (!instRef.current) return;
+    // remove old
+    Object.values(outageLayerRef.current).forEach(m => m.remove());
+    outageLayerRef.current = {};
+    districts.filter(d => d.outage).forEach(d => {
+      const icon = L.divIcon({
+        html: `<div style="width:22px;height:22px;border-radius:50%;border:2px solid #ff3355;
+          background:rgba(255,51,85,0.15);box-shadow:0 0 14px #ff3355;
+          animation:none;display:flex;align-items:center;justify-content:center;font-size:11px;">⚡</div>`,
+        className: '', iconSize: [22, 22], iconAnchor: [11, 11]
+      });
+      const marker = L.marker([d.lat, d.lng], { icon })
+        .bindPopup(`<b>${d.name}</b><br/>🔴 KESİNTİ — ${d.isp}<br/>Yoğunluk: ${d.congestion}%`)
+        .addTo(instRef.current);
+      outageLayerRef.current[d.id] = marker;
+    });
+  }, [districts]);
+
+  /* update drone markers */
+  useEffect(() => {
+    if (!instRef.current) return;
+    Object.values(droneLayerRef.current).forEach(m => m.remove());
+    droneLayerRef.current = {};
+    drones.filter(d => d.status !== 'MAINTENANCE').forEach(drone => {
+      const color = drone.status === 'STANDBY' ? '#4a7a9e'
+        : drone.status === 'ON_SITE'   ? '#00ff88'
+        : drone.status === 'RETURNING' ? '#00d4ff'
+        : '#ffaa00';
+      const icon = L.divIcon({
+        html: `<div style="font-size:16px;line-height:1;text-shadow:0 0 10px ${color};filter:drop-shadow(0 0 4px ${color})">🚁</div>`,
+        className: '', iconSize: [24, 24], iconAnchor: [12, 12]
+      });
+      const marker = L.marker([drone.lat, drone.lng], { icon })
+        .bindPopup(`<b>${drone.name}</b><br/>Durum: ${drone.status}<br/>Batarya: ${drone.battery}%`)
+        .addTo(instRef.current);
+      droneLayerRef.current[drone.id] = marker;
+    });
+  }, [drones]);
+
+  return (
+    <div className="map-col" style={{position:'relative'}}>
+      <div ref={mapRef} id="map" />
+      <div className="map-overlay-badge">İZMİR — CANLI AĞ HARİTASI</div>
+      <div className="map-legend">
+        <div style={{fontSize:'9px',letterSpacing:'2px',color:'#4a7a9e',marginBottom:'5px'}}>YOĞUNLUK</div>
+        {[['#00ff88','Düşük (0–40%)'],['#ffaa00','Orta (40–60%)'],['#ff6a00','Yüksek (60–80%)'],['#ff3355','Kritik (80%+)']].map(([c,l])=>(
+          <div key={c} className="legend-row">
+            <div className="legend-dot" style={{background:c,boxShadow:`0 0 5px ${c}`}} />
+            <span style={{fontSize:'9px'}}>{l}</span>
+          </div>
+        ))}
+        <div style={{marginTop:'6px',borderTop:'1px solid #112840',paddingTop:'5px'}}>
+          <div className="legend-row"><span style={{fontSize:'14px'}}>⚡</span><span style={{fontSize:'9px'}}>Kesinti noktası</span></div>
+          <div className="legend-row"><span style={{fontSize:'14px'}}>🚁</span><span style={{fontSize:'9px'}}>Dron konumu</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   AI PANEL
+───────────────────────────────────────────────────── */
+function AIPanel({ districts, aiMode, autoPilot, onToggleAuto }) {
+  const avgCong = Math.round(districts.reduce((s,d)=>s+d.congestion,0)/districts.length);
+  const outageCount = districts.filter(d=>d.outage).length;
+
+  const pred = (add, noise) => clamp(avgCong + add + Math.round((Math.random()-0.5)*noise), 0, 100);
+  const p15 = pred(3, 8), p30 = pred(6, 12), p60 = pred(10, 18);
+
+  const recs = [];
+  if (outageCount > 0)  recs.push({ level:'high', text:`${outageCount} bölgede aktif kesinti — acil müdahale` });
+  if (avgCong >= 75)    recs.push({ level:'high', text:'Kritik eşik aşıldı — dron sevkiyatı önerilir' });
+  if (avgCong >= 50)    recs.push({ level:'med',  text:'Yoğunluk artışı izleniyor — ISP ile iletişime geç' });
+  if (p30 > avgCong+5) recs.push({ level:'med',  text:'30 dk içinde yoğunluk artışı bekleniyor' });
+  if (avgCong < 40)     recs.push({ level:'low',  text:'Sistem kararlı — standart izleme sürdürülüyor' });
+  if (recs.length === 0) recs.push({ level:'low', text:'Anormal durum tespit edilmedi' });
+
+  const modeColor = aiMode==='NORMAL'?'var(--green)':aiMode==='ALERT'?'var(--amber)':'var(--red)';
+
+  return (
+    <div className="section">
+      <div className="section-title">YZ KARAR MOTORU</div>
+      <div className="ai-status-row">
+        <div>
+          <div className="ai-mode-big" style={{color:modeColor}}>{aiMode}</div>
+          <div style={{fontSize:'9px',color:'var(--text-dim)',marginTop:2}}>
+            Ort. Yoğunluk: <span style={{color:congColor(avgCong)}}>{avgCong}%</span>
+            &nbsp;·&nbsp;Kesinti: <span style={{color:'var(--red)'}}>{outageCount}</span>
+          </div>
+        </div>
+        <button className={`ai-toggle${autoPilot?' on':''}`} onClick={onToggleAuto}>
+          {autoPilot ? '⟳ OTOMATİK' : '⊘ MANUEL'}
+        </button>
+      </div>
+
+      <div style={{fontSize:'9px',color:'var(--text-dim)',marginBottom:'4px',letterSpacing:'1px'}}>TAHMİN</div>
+      <div className="pred-row">
+        {[[p15,'15 dk'],[p30,'30 dk'],[p60,'60 dk']].map(([v,t])=>(
+          <div key={t} className="pred-card">
+            <div className="pred-time">{t}</div>
+            <div className="pred-val" style={{color:congColor(v)}}>{v}%</div>
+            <div className="pred-trend" style={{color:v>avgCong?'var(--red)':'var(--green)'}}>
+              {v>avgCong?'↑ artış':'↓ azalış'}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{fontSize:'9px',color:'var(--text-dim)',marginBottom:'5px',letterSpacing:'1px'}}>ÖNERİLER</div>
+      <ul className="rec-list">
+        {recs.map((r,i)=>(
+          <li key={i} className={`rec-item ${r.level}`}>{r.text}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   DRONE PANEL
+───────────────────────────────────────────────────── */
+function DronePanel({ drones, districts, onDeploy, onRecall }) {
+  return (
+    <div className="section">
+      <div className="section-title">DRON SEVK SİSTEMİ</div>
+      {drones.map(drone => {
+        const batColor = drone.battery>50?'var(--green)':drone.battery>20?'var(--amber)':'var(--red)';
+        const canDeploy = drone.status==='STANDBY' && drone.battery>20;
+        const canRecall = drone.status==='ON_SITE'||drone.status==='EN_ROUTE'||drone.status==='DEPLOYED';
+        const target = districts.find(d=>d.id===drone.target);
+        return (
+          <div key={drone.id} className="drone-card">
+            <div className="drone-header">
+              <div>
+                <span className="drone-name">🚁 {drone.name}</span>
+                <span style={{fontSize:'9px',color:'var(--text-dim)',marginLeft:'6px'}}>{drone.id}</span>
+              </div>
+              <span className={`drone-status-tag st-${drone.status}`}>{drone.status}</span>
+            </div>
+            <div className="drone-battery">
+              <div className="bat-bar">
+                <div className="bat-fill" style={{width:`${drone.battery}%`,background:batColor}} />
+              </div>
+              <span className="bat-label" style={{color:batColor}}>{drone.battery}%</span>
+            </div>
+            {target && (
+              <div style={{marginBottom:'6px'}}>
+                <div style={{fontSize:'11px',color:'var(--cyan)',fontWeight:600,marginBottom:'3px'}}>
+                  → {target.name} — {target.congestion}% yoğunluk
+                </div>
+                {drone.reason && (
+                  <div style={{
+                    fontSize:'10px', color:'var(--text-dim)', lineHeight:'1.45',
+                    background:'rgba(0,212,255,0.04)', border:'1px solid var(--border)',
+                    borderLeft:'2px solid var(--cyan-dim)',
+                    borderRadius:'3px', padding:'4px 7px',
+                  }}>
+                    💡 {drone.reason}
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
+              {canDeploy && (
+                <button className="drone-btn btn-deploy" onClick={()=>onDeploy(drone.id)}>▶ SEVK ET</button>
+              )}
+              {canRecall && (
+                <button className="drone-btn btn-recall" onClick={()=>onRecall(drone.id)}>↩ GERİ ÇAĞ</button>
+              )}
+              {drone.status==='MAINTENANCE' && (
+                <button className="drone-btn btn-disabled" disabled>🔧 BAKIM</button>
+              )}
+              {drone.status==='RETURNING' && (
+                <button className="drone-btn btn-disabled" disabled>↩ DÖNÜYOR…</button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   NOTIFICATION PANEL
+───────────────────────────────────────────────────── */
+function NotificationPanel({ notifications, aiMode, onSendAll }) {
+  return (
+    <div className="section">
+      <div className="section-title">OTORİTE BİLDİRİM SİSTEMİ</div>
+      {aiMode === 'CRISIS' && (
+        <div style={{
+          background:'rgba(255,51,85,0.1)', border:'1px solid var(--red)',
+          borderRadius:'4px', padding:'6px 8px', marginBottom:'8px',
+          fontSize:'10px', color:'var(--red)'
+        }}>
+          ⚠ KRİZ MODU — Otomatik bildirim tetiklendi
+        </div>
+      )}
+      <button className="send-btn" onClick={onSendAll}>
+        📡 TÜM OTORİTELERE GÖNDER
+      </button>
+      <div style={{marginTop:'8px'}}>
+        {notifications.slice().reverse().map(n=>(
+          <div key={n.id} className="notif-card">
+            <div className="notif-header">
+              <span className="notif-to">{n.authority}</span>
+              <span className={`notif-status ns-${n.status}`}>{n.status}</span>
+            </div>
+            <div className="notif-msg">{n.message}</div>
+            <div className="notif-time">{n.time}</div>
+          </div>
+        ))}
+        {notifications.length === 0 && (
+          <div style={{fontSize:'10px',color:'var(--text-dim)',textAlign:'center',padding:'12px'}}>
+            Henüz bildirim gönderilmedi
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   DISTRICT LIST
+───────────────────────────────────────────────────── */
+function DistrictList({ districts, selected, onSelect }) {
+  const sorted = [...districts].sort((a,b)=>b.congestion-a.congestion);
+  return (
+    <div className="section">
+      <div className="section-title">BÖLGE DURUMLARI</div>
+      {sorted.map(d=>(
+        <div
+          key={d.id}
+          className={`district-item${selected===d.id?' selected':''}`}
+          onClick={()=>onSelect(d.id===selected?null:d.id)}
+        >
+          <span className="district-name">
+            {d.name}
+            {d.outage && <span className="outage-dot" title="Kesinti" />}
+          </span>
+          <div className="cong-bar-wrap">
+            <div className="cong-bar" style={{width:`${d.congestion}%`,background:congColor(d.congestion)}} />
+          </div>
+          <span className="cong-val" style={{color:congColor(d.congestion)}}>{d.congestion}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   HEADER
+───────────────────────────────────────────────────── */
+function Header({ districts, aiMode, time, onCrisis, onReset, crisisActive }) {
+  const outages   = districts.filter(d=>d.outage).length;
+  const avgCong   = Math.round(districts.reduce((s,d)=>s+d.congestion,0)/districts.length);
+  const critical  = districts.filter(d=>d.congestion>=80).length;
+  const hstatColor = aiMode==='NORMAL'?'var(--green)':aiMode==='ALERT'?'var(--amber)':'var(--red)';
+
+  return (
+    <div className="header">
+      <div className="header-logo">
+        <div className="logo-icon">📡</div>
+        <div>
+          <div className="logo-title">AğdaKal</div>
+          <div className="logo-sub">İZMİR AĞ İZLEME MERKEZİ</div>
+        </div>
+      </div>
+
+      <div className="header-stats">
+        {[
+          [outages,    'KESİNTİ',  outages>0?'var(--red)':'var(--green)'],
+          [avgCong+'%','ORT YOĞ.', congColor(avgCong)],
+          [critical,   'KRİTİK',   critical>0?'var(--red)':'var(--green)'],
+          [districts.length,'BÖLGE','var(--cyan)'],
+        ].map(([v,l,c])=>(
+          <div key={l} className="hstat">
+            <div className="hstat-val" style={{color:c}}>{v}</div>
+            <div className="hstat-label">{l}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="header-right">
+        <span className={`mode-badge mode-${aiMode}`}>◉ {aiMode}</span>
+        <span className="time-display">{fmtTime(time)}</span>
+        <button className="crisis-btn" onClick={onCrisis} disabled={crisisActive}>
+          ⚡ KRİZ SİMÜLASYONU
+        </button>
+        <button className="reset-btn" onClick={onReset}>↺ SIFIRLA</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   APP
+───────────────────────────────────────────────────── */
+function App() {
+  const [districts,     setDistricts]     = useState(INIT_DISTRICTS);
+  const [drones,        setDrones]        = useState(INIT_DRONES);
+  const [notifications, setNotifications] = useState([]);
+  const [aiMode,        setAiMode]        = useState('ALERT');
+  const [autoPilot,     setAutoPilot]     = useState(true);
+  const [selected,      setSelected]      = useState(null);
+  const [time,          setTime]          = useState(new Date());
+  const [crisisActive,  setCrisisActive]  = useState(false);
+  const notifIdRef    = useRef(100);
+  const tickRef       = useRef(0);
+  const districtsRef  = useRef(INIT_DISTRICTS);
+
+  /* districts ref sync — drone hareketi için */
+  useEffect(() => { districtsRef.current = districts; }, [districts]);
+
+  /* clock */
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* simulation */
+  useEffect(() => {
+    const id = setInterval(() => {
+      tickRef.current++;
+      const tick = tickRef.current;
+
+      setDistricts(prev => prev.map(d => {
+        let delta = (Math.random() - 0.5) * 6;
+        // slow drift toward 50
+        delta += (50 - d.congestion) * 0.02;
+        const newCong = clamp(Math.round(d.congestion + delta), 5, 99);
+        // outage logic: high congestion can trigger, fixing slowly
+        let newOutage = d.outage;
+        if (!d.outage && newCong >= 95 && Math.random() < 0.15) newOutage = true;
+        if (d.outage && newCong < 70 && Math.random() < 0.08)   newOutage = false;
+        return { ...d, congestion: newCong, outage: newOutage };
+      }));
+
+      // update drones: hareket + batarya
+      setDrones(prev => prev.map(drone => {
+        if (drone.status === 'MAINTENANCE') return drone;
+        let { lat, lng, battery, status, target, progress } = drone;
+        let newBat = Math.max(0, battery - (status==='STANDBY'?0.1:0.4));
+        if (newBat < 15 && status !== 'RETURNING' && status !== 'STANDBY') {
+          return { ...drone, battery: Math.round(newBat), status:'RETURNING', target:null };
+        }
+        if (status === 'EN_ROUTE' && target !== null) {
+          const td = districtsRef.current.find(d => d.id === target);
+          const newProgress = Math.min(1, progress + 0.07);
+          const newLat = td ? lerp(BASE.lat, td.lat, newProgress) : lat;
+          const newLng = td ? lerp(BASE.lng, td.lng, newProgress) : lng;
+          return { ...drone, battery:Math.round(newBat), progress:newProgress,
+            lat:newLat, lng:newLng,
+            status: newProgress >= 1 ? 'ON_SITE' : 'EN_ROUTE' };
+        }
+        if (status === 'RETURNING') {
+          const newLat = lerp(lat, BASE.lat, 0.15);
+          const newLng = lerp(lng, BASE.lng, 0.15);
+          const arrived = Math.abs(newLat - BASE.lat) < 0.002 && Math.abs(newLng - BASE.lng) < 0.002;
+          if (arrived) {
+            return { ...drone, battery:Math.round(newBat), status:'STANDBY',
+              target:null, progress:0, lat:BASE.lat, lng:BASE.lng };
+          }
+          return { ...drone, battery:Math.round(newBat), lat:newLat, lng:newLng };
+        }
+        return { ...drone, battery:Math.round(newBat) };
+      }));
+
+      // compute AI mode
+      setDistricts(curr => {
+        const avgC = curr.reduce((s,d)=>s+d.congestion,0)/curr.length;
+        const hasOutage = curr.some(d=>d.outage);
+        const newMode = (avgC >= 65 || hasOutage) ? 'CRISIS'
+          : avgC >= 45 ? 'ALERT' : 'NORMAL';
+        setAiMode(newMode);
+
+        // auto-pilot: deploy drone to worst district
+        if (autoPilot && newMode === 'CRISIS' && tick % 10 === 0) {
+          setDrones(drones => {
+            const standby = drones.filter(d=>d.status==='STANDBY'&&d.battery>30);
+            if (standby.length === 0) return drones;
+            const worstDistrict = curr.slice().sort((a,b)=>b.congestion-a.congestion)[0];
+            const drone = standby[0];
+            const reason = generateReason(worstDistrict, 'YZ OTO-PİLOT');
+            addNotif(`DRON AUTO-SEVK: ${drone.name} → ${worstDistrict.name}`, 'YZ SİSTEMİ', 'SENT');
+            return drones.map(d => d.id===drone.id
+              ? {...d, status:'EN_ROUTE', target:worstDistrict.id, progress:0, lat:BASE.lat, lng:BASE.lng, reason}
+              : d);
+          });
+        }
+        return curr;
+      });
+    }, 2500);
+    return () => clearInterval(id);
+  }, [autoPilot]);
+
+  function addNotif(message, authority, status='SENT') {
+    setNotifications(prev => [...prev.slice(-19), {
+      id: ++notifIdRef.current, authority, message, status,
+      time: fmtFull(new Date())
+    }]);
+  }
+
+  function handleDeploy(droneId) {
+    setDistricts(curr => {
+      const worst = curr.slice().sort((a,b)=>b.congestion-a.congestion)[0];
+      const reason = generateReason(worst, 'OPERATÖR');
+      setDrones(prev => prev.map(d => d.id===droneId
+        ? {...d, status:'EN_ROUTE', target:worst.id, progress:0, lat:BASE.lat, lng:BASE.lng, reason}
+        : d));
+      const drone = INIT_DRONES.find(d=>d.id===droneId) || {name:droneId};
+      addNotif(`${drone.name} sevk edildi → ${worst.name} (${worst.congestion}% yoğunluk)`, 'OPERATÖR', 'SENT');
+      return curr;
+    });
+  }
+
+  function handleRecall(droneId) {
+    setDrones(prev => prev.map(d => d.id===droneId
+      ? {...d, status:'RETURNING', target:null, progress:0}
+      : d));
+    const drone = drones.find(d=>d.id===droneId);
+    if (drone) addNotif(`${drone.name} geri çağrıldı — ÜSE DÖNÜYOR`, 'OPERATÖR', 'SENT');
+  }
+
+  function handleCrisis() {
+    setCrisisActive(true);
+    setAiMode('CRISIS');
+    // Beş merkezi ilçeyi kritik seviyeye çıkar
+    const crisisIds = [1, 2, 3, 5, 9];
+    setDistricts(prev => prev.map(d => ({
+      ...d,
+      congestion: crisisIds.includes(d.id) ? clamp(88 + Math.floor(Math.random()*10), 88, 98) : d.congestion,
+      outage:     crisisIds.includes(d.id) ? true : d.outage,
+    })));
+    // Tüm uygun dronları sevk et
+    const targets = [1, 2, 5, 9];
+    setDrones(prev => {
+      let ti = 0;
+      return prev.map(d => {
+        if (d.status === 'STANDBY' && d.battery > 20 && ti < targets.length) {
+          const t = targets[ti++];
+          const td = districtsRef.current.find(x => x.id === t);
+          const reason = td ? generateReason(td, 'KRİZ SİMÜLASYONU') : 'Kriz bölgesi — acil sevkiyat.';
+          return { ...d, status: 'EN_ROUTE', target: t, progress: 0, lat: BASE.lat, lng: BASE.lng, reason };
+        }
+        return d;
+      });
+    });
+    // Tüm otoritelere acil bildirim
+    AUTHORITIES.forEach((auth, i) => {
+      setTimeout(() => {
+        addNotif(
+          `🚨 [ACİL] Konak, Bornova, Bayraklı, Karşıyaka, Karabağlar'da eş zamanlı büyük kesinti. ` +
+          `YZ KRİZ modu aktif. Dronlar sevk edildi. Müdahale bekleniyor.`,
+          auth.abbr, 'SENT'
+        );
+      }, i * 250);
+    });
+  }
+
+  function handleReset() {
+    setCrisisActive(false);
+    setDistricts(INIT_DISTRICTS);
+    setDrones(INIT_DRONES);
+    setNotifications([]);
+    setAiMode('ALERT');
+  }
+
+  function handleSendAll() {
+    const avgCong = Math.round(districts.reduce((s,d)=>s+d.congestion,0)/districts.length);
+    const outages = districts.filter(d=>d.outage);
+    const severity = aiMode==='CRISIS'?'KRİTİK':aiMode==='ALERT'?'UYARI':'BİLGİ';
+    AUTHORITIES.forEach((auth, i) => {
+      setTimeout(() => {
+        const msg = `[${severity}] İzmir geneli ağ yoğunluğu %${avgCong}. ` +
+          (outages.length>0 ? `${outages.length} bölgede kesinti aktif: ${outages.map(d=>d.name).join(', ')}.` : 'Aktif kesinti yok.') +
+          ` YZ Modu: ${aiMode}.`;
+        addNotif(msg, auth.abbr, 'SENT');
+      }, i * 300);
+    });
+  }
+
+  const outages = districts.filter(d=>d.outage).length;
+
+  return (
+    <div className="app">
+      {crisisActive && <div className="crisis-flash" />}
+      {crisisActive && (
+        <div className="crisis-alert-bar">
+          🚨 KRİZ MODU AKTİF — YZ EŞ ZAMANLI KESİNTİ TESPİT ETTİ — DRONLAR SAHADА — OTORİTELER BİLGİLENDİRİLDİ 🚨
+        </div>
+      )}
+      <Header districts={districts} aiMode={aiMode} time={time}
+        onCrisis={handleCrisis} onReset={handleReset} crisisActive={crisisActive} />
+      <div className="content">
+        {/* LEFT */}
+        <div className="left-col">
+          <AIPanel
+            districts={districts} aiMode={aiMode}
+            autoPilot={autoPilot} onToggleAuto={()=>setAutoPilot(p=>!p)}
+          />
+          <DronePanel
+            drones={drones} districts={districts}
+            onDeploy={handleDeploy} onRecall={handleRecall}
+          />
+        </div>
+
+        {/* MAP */}
+        <MapView districts={districts} drones={drones} />
+
+        {/* RIGHT */}
+        <div className="right-col">
+          <NotificationPanel
+            notifications={notifications} aiMode={aiMode}
+            onSendAll={handleSendAll}
+          />
+          <DistrictList
+            districts={districts} selected={selected} onSelect={setSelected}
+          />
+        </div>
+      </div>
+
+      <div className="footer">
+        <span>AğdaKal v2.1 — YZ destekli ağ izleme</span>
+        <span>
+          <span className={outages>0?'footer-red':'footer-green'}>
+            {outages>0?`⚡ ${outages} AKTİF KESİNTİ`:'✓ TÜM HATLAR AKTİF'}
+          </span>
+          <span style={{marginLeft:'16px'}}>
+            DRONLAR: {drones.filter(d=>d.status==='ON_SITE'||d.status==='EN_ROUTE').length}/
+            {drones.filter(d=>d.status!=='MAINTENANCE').length} GÖREVDE
+          </span>
+        </span>
+        <span>SİMÜLASYON — GERÇEK VERİ DEĞİLDİR</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
